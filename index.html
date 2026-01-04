@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>lomonroom - Messagerie de groupe</title>
+  <style>
+    body { font-family: Arial, sans-serif; background:#111; color:#eee; margin:0; padding:0; }
+    .container { max-width: 800px; margin: 0 auto; padding: 20px; }
+    h1 { text-align:center; color:#0f0; }
+    #login { background:#222; padding:15px; border-radius:8px; margin-bottom:15px; }
+    #chat { display:none; background:#222; padding:15px; border-radius:8px; }
+    label { display:block; margin:5px 0 2px; }
+    input[type="text"] { width:100%; padding:8px; margin-bottom:8px; border-radius:4px; border:1px solid #555; background:#111; color:#eee; }
+    button { padding:8px 15px; border:none; border-radius:4px; background:#0f0; color:#000; cursor:pointer; }
+    button:hover { background:#5f5; }
+    #status { margin-top:5px; font-size:0.9em; color:#ccc; }
+    #messages { height:300px; overflow-y:auto; border:1px solid #444; padding:8px; background:#111; margin-bottom:8px; }
+    .msg { margin-bottom:5px; }
+    .msg .pseudo { font-weight:bold; color:#0f0; }
+    .msg .time { font-size:0.8em; color:#888; margin-left:5px; }
+    .sys { color:#0af; font-style:italic; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>lomonroom</h1>
+
+    <div id="login">
+      <label for="pseudo">Votre pseudo</label>
+      <input type="text" id="pseudo" placeholder="ex: Kader">
+
+      <label for="roomCode">Code du groupe</label>
+      <input type="text" id="roomCode" placeholder="ex: famille2025">
+
+      <button id="joinBtn">Rejoindre le groupe</button>
+      <div id="status"></div>
+    </div>
+
+    <div id="chat">
+      <div id="messages"></div>
+      <form id="form">
+        <input id="input" autocomplete="off" placeholder="Votre message..." />
+        <button type="submit">Envoyer</button>
+      </form>
+    </div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    const socket = io();
+
+    const pseudoInput = document.getElementById('pseudo');
+    const roomInput = document.getElementById('roomCode');
+    const joinBtn = document.getElementById('joinBtn');
+    const statusEl = document.getElementById('status');
+    const loginBox = document.getElementById('login');
+
+    const chatBox = document.getElementById('chat');
+    const messagesEl = document.getElementById('messages');
+    const form = document.getElementById('form');
+    const input = document.getElementById('input');
+
+    joinBtn.addEventListener('click', () => {
+      const pseudo = pseudoInput.value.trim();
+      const roomCode = roomInput.value.trim();
+
+      if (!pseudo || !roomCode) {
+        statusEl.textContent = 'Pseudo et code de groupe sont obligatoires.';
+        statusEl.style.color = 'orange';
+        return;
+      }
+
+      statusEl.textContent = 'Connexion au salon...';
+      statusEl.style.color = '#ccc';
+
+      socket.emit('join-room', { roomCode, pseudo });
+    });
+
+    socket.on('room-full', (msg) => {
+      statusEl.textContent = msg;
+      statusEl.style.color = 'red';
+    });
+
+    socket.on('error-message', (msg) => {
+      statusEl.textContent = msg;
+      statusEl.style.color = 'red';
+    });
+
+    socket.on('joined', (msg) => {
+      statusEl.textContent = msg;
+      statusEl.style.color = '#0f0';
+      loginBox.style.display = 'none';
+      chatBox.style.display = 'block';
+      addSystemMessage(msg);
+    });
+
+    socket.on('user-joined', (msg) => {
+      addSystemMessage(msg);
+    });
+
+    socket.on('user-left', (msg) => {
+      addSystemMessage(msg);
+    });
+
+    socket.on('chat-message', (data) => {
+      addChatMessage(data.pseudo, data.message, data.time);
+    });
+
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      if (!input.value.trim()) return;
+      socket.emit('chat-message', input.value);
+      input.value = '';
+    });
+
+    function addSystemMessage(text) {
+      const div = document.createElement('div');
+      div.className = 'msg sys';
+      div.textContent = text;
+      messagesEl.appendChild(div);
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+    }
+
+    function addChatMessage(pseudo, message, time) {
+      const div = document.createElement('div');
+      div.className = 'msg';
+
+      const strong = document.createElement('span');
+      strong.className = 'pseudo';
+      strong.textContent = pseudo;
+
+      const timeSpan = document.createElement('span');
+      timeSpan.className = 'time';
+      timeSpan.textContent = time;
+
+      const textSpan = document.createElement('span');
+      textSpan.textContent = ' : ' + message;
+
+      div.appendChild(strong);
+      div.appendChild(timeSpan);
+      div.appendChild(textSpan);
+
+      messagesEl.appendChild(div);
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+    }
+  </script>
+</body>
+</html>
